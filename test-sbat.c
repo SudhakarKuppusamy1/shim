@@ -5,6 +5,7 @@
 
 #ifndef SHIM_UNIT_TEST
 #define SHIM_UNIT_TEST
+#include "sbat_var_defs.h"
 #endif
 #include "shim.h"
 
@@ -378,7 +379,7 @@ test_parse_sbat_var_null_list(void)
 	EFI_STATUS status;
 
 	INIT_LIST_HEAD(&sbat_var);
-	status = parse_sbat_var(NULL);
+	status = parse_sbat_var(NULL, NULL);
 	cleanup_sbat_var(&sbat_var);
 	assert_equal_return(status, EFI_INVALID_PARAMETER, -1, "got %#hhx expected %#hhx\n");
 
@@ -1130,9 +1131,9 @@ test_sbat_var_asciz(void)
 	char buf[1024] = "";
 	UINT32 attrs = 0;
 	UINTN size = sizeof(buf);
-	char expected[] = SBAT_VAR_PREVIOUS;
+	char expected[] = SBAT_VAR_AUTOMATIC;
 
-	status = set_sbat_uefi_variable();
+	status = set_sbat_uefi_variable(SBAT_VAR_AUTOMATIC, SBAT_VAR_AUTOMATIC);
 	if (status != EFI_SUCCESS)
 		return -1;
 

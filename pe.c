@@ -355,7 +355,11 @@ verify_sbat_section(char *SBATBase, size_t SBATSize)
 		return in_protocol ? EFI_SUCCESS : EFI_SECURITY_VIOLATION;
 	}
 
-	sbat_size = SBATSize + 1;
+	if (checked_add(SBATSize, 1, &sbat_size)) {
+		dprint(L"SBATSize + 1 would overflow\n");
+		return EFI_SECURITY_VIOLATION;
+	}
+
 	sbat_data = AllocatePool(sbat_size);
 	if (!sbat_data) {
 		console_print(L"Failed to allocate .sbat section buffer\n");
@@ -494,10 +498,20 @@ update_mem_attrs(uintptr_t addr, uint64_t size,
 	uefi_clear_attrs = shim_mem_attrs_to_uefi_mem_attrs (clear_attrs);
 	dprint("translating clear_attrs from 0x%lx to 0x%lx\n", clear_attrs, uefi_clear_attrs);
 	efi_status = EFI_SUCCESS;
-	if (uefi_set_attrs)
+	if (uefi_set_attrs) {
 		efi_status = proto->SetMemoryAttributes(proto, physaddr, size, uefi_set_attrs);
-	if (!EFI_ERROR(efi_status) && uefi_clear_attrs)
+		if (EFI_ERROR(efi_status)) {
+			dprint(L"Failed to set memory attrs:0x%0x physaddr:0x%llx size:0x%0lx status:%r\n",
+				uefi_set_attrs, physaddr, size, efi_status);
+		}
+	}
+	if (!EFI_ERROR(efi_status) && uefi_clear_attrs) {
 		efi_status = proto->ClearMemoryAttributes(proto, physaddr, size, uefi_clear_attrs);
+		if (EFI_ERROR(efi_status)) {
+			dprint(L"Failed to clear memory attrs:0x%0x physaddr:0x%llx size:0x%0lx status:%r\n",
+				uefi_clear_attrs, physaddr, size, efi_status);
+		}
+	}
 	ret = efi_status;
 
 	efi_status = get_mem_attrs (addr, size, &after);
