@@ -52,8 +52,6 @@ extern struct {
 	UINT32 vendor_deauthorized_offset;
 } cert_table;
 
-#define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
-
 typedef enum {
 	DATA_FOUND,
 	DATA_NOT_FOUND,
@@ -1929,7 +1927,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 
 		efi_status = verify_sbat_section(sbat_start, sbat_end - sbat_start - 1);
 		if (EFI_ERROR(efi_status)) {
-			perror(L"Verifiying shim SBAT data failed: %r\n",
+			perror(L"Verifying shim SBAT data failed: %r\n",
 			       efi_status);
 			msg = SBAT_SELF_CHECK;
 			goto die;
