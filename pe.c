@@ -480,7 +480,7 @@ update_mem_attrs(uintptr_t addr, uint64_t size,
 		       &before, efi_status);
 
 	if (!IS_PAGE_ALIGNED(physaddr) || !IS_PAGE_ALIGNED(size) || size == 0) {
-		dprint(L"%a called on 0x%llx-0x%llx (size 0x%llx) +%a%a%a -%a%a%a\n",
+		perror(L"Invalid call %a(addr:0x%llx-0x%llx, size:0x%llx, +%a%a%a, -%a%a%a)\n",
 		       __func__, (unsigned long long)physaddr,
 		       (unsigned long long)(physaddr + size - 1),
 		       (unsigned long long)size,
@@ -490,6 +490,12 @@ update_mem_attrs(uintptr_t addr, uint64_t size,
 		       (clear_attrs & MEM_ATTR_R) ? "r" : "",
 		       (clear_attrs & MEM_ATTR_W) ? "w" : "",
 		       (clear_attrs & MEM_ATTR_X) ? "x" : "");
+		if (!IS_PAGE_ALIGNED(physaddr))
+			perror(L" addr is not page aligned\n");
+		if (!IS_PAGE_ALIGNED(size))
+			perror(L" size is not page aligned\n");
+		if (size == 0)
+			perror(L" size is 0\n");
 		return 0;
 	}
 
@@ -640,7 +646,7 @@ handle_image (void *data, unsigned int datasize,
 					   sha1hash);
 
 		if (EFI_ERROR(efi_status)) {
-			if (verbose)
+			if (verbose || in_protocol)
 				console_print(L"Verification failed: %r\n", efi_status);
 			else
 				console_error(L"Verification failed", efi_status);

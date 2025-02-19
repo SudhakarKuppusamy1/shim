@@ -6,6 +6,7 @@
 #include "shim.h"
 
 CHAR16 *second_stage;
+CHAR16 *optional_second_stage = NULL;
 void *load_options;
 UINT32 load_options_size;
 
@@ -207,14 +208,14 @@ get_load_option_optional_data(VOID *data, UINT32 data_size,
 		 */
 		i += dp.len;
 	}
-	if (i != fplistlen)
+	if (i > fplistlen)
 		return EFI_INVALID_PARAMETER;
 
 	/*
-	 * if there's any space left, it's "optional data"
+	 * Anything left after the file path list is optional data.
 	 */
-	*od = cur + i;
-	*ods = limit - i;
+	*od = cur + fplistlen;
+	*ods = limit - fplistlen;
 	return EFI_SUCCESS;
 }
 
@@ -441,6 +442,14 @@ parse_load_options(EFI_LOADED_IMAGE *li)
 			li->LoadOptionsSize = remaining_size;
 		}
 	}
+
+	/*
+	 * Windows bcdedit.exe puts "WINDOWS\0" (in 8-bit) in the beginning of
+	 * the options, so if we see that, we know it's not useful to us.
+	 */
+	if (li->LoadOptionsSize >= 8)
+		if (CompareMem(li->LoadOptions, "WINDOWS", 8) == 0)
+			return EFI_SUCCESS;
 
 	loader_str = split_load_options(li->LoadOptions, li->LoadOptionsSize,
 					&remaining, &remaining_size);
