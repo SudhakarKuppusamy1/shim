@@ -961,7 +961,7 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 
 	in_protocol = 1;
 
-	efi_status = read_header(buffer, size, &context);
+	efi_status = read_header(buffer, size, &context, true);
 	if (EFI_ERROR(efi_status))
 		goto done;
 
@@ -1016,7 +1016,7 @@ static EFI_STATUS shim_read_header(void *data, unsigned int datasize,
 	EFI_STATUS efi_status;
 
 	in_protocol = 1;
-	efi_status = read_header(data, datasize, context);
+	efi_status = read_header(data, datasize, context, true);
 	in_protocol = 0;
 
 	return efi_status;
@@ -1181,6 +1181,10 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		ClearErrors();
 		goto restore;
 	}
+
+#if 0
+	save_logs();
+#endif
 
 	/*
 	 * The binary is trusted and relocated. Run it
@@ -1991,6 +1995,8 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	debug_hook();
 
+	get_shim_nx_capability(image_handle);
+
 	efi_status = set_sbat_uefi_variable_internal();
 	if (EFI_ERROR(efi_status) && secure_mode()) {
 		perror(L"%s variable initialization failed\n", SBAT_VAR_NAME);
@@ -2031,6 +2037,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	}
 
 	init_openssl();
+	get_hsi_mem_info();
 
 	efi_status = load_unbundled_trust(global_image_handle);
 	if (EFI_ERROR(efi_status)) {
