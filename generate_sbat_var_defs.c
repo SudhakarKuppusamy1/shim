@@ -27,8 +27,9 @@ readfile(char *SbatLevel_Variable)
 	FILE *varfilep;
 	char line[1024];
 	int date;
+	int ret = -1;
 
-	int revocationsp = 0;
+	unsigned int revocationsp = 0;
 
 	sbat_revocation *revlistlast = NULL;
 	sbat_revocation *revlistentry = NULL;
@@ -41,10 +42,9 @@ readfile(char *SbatLevel_Variable)
 
 	while (fgets(line, sizeof(line), varfilep) != NULL) {
 		if (sscanf(line, "sbat,1,%d\n", &date) && strlen(line) == 18) {
-			revlistentry =
-				(sbat_revocation *)malloc(sizeof(sbat_revocation));
+			revlistentry = calloc(1, sizeof(sbat_revocation));
 			if (revlistentry == NULL)
-				return -1;
+				goto err;
 			if (revlisthead == NULL)
 				revlisthead = revlistentry;
 			else
@@ -55,25 +55,42 @@ readfile(char *SbatLevel_Variable)
 			revlistentry->date = date;
 			while (line[0] != '\n' &&
 			       fgets(line, sizeof(line), varfilep) != NULL) {
-					revlistentry->revocations =
-						(char *)realloc(revlistentry->revocations,
-								 revocationsp +
-								 strlen(line) + 1);
-					if (revlistentry->revocations == NULL)
-						return -1;
-					if (strlen(line) > 1) {
-						line[strlen(line) -1] = 0;
-						sprintf(revlistentry->revocations
-							+ revocationsp, "%s\\n", line);
-					revocationsp = revocationsp + strlen(line) + 2;
-					}
+				char *new = NULL;
+				new = realloc(revlistentry->revocations,
+				              revocationsp + strlen(line) + 1);
+				if (new == NULL) {
+					ret = -1;
+					goto err;
+				}
+				revlistentry->revocations = new;
+				if (strlen(line) > 1) {
+					line[strlen(line) - 1] = 0;
+					sprintf(revlistentry->revocations +
+					                revocationsp,
+					        "%s\\n", line);
+					revocationsp =
+						revocationsp + strlen(line) + 2;
+				}
 			}
 			revocationsp = 0;
-
 		}
 	}
 
-	return 1;
+	ret = 1;
+err:
+	if (ret < 0 && revlisthead) {
+		sbat_revocation *rle = revlisthead;
+		while (rle) {
+			sbat_revocation *next = rle->next;
+			if (rle->revocations)
+				free(rle->revocations);
+			free(rle);
+			rle = next;
+		}
+		revlisthead = NULL;
+	}
+	fclose(varfilep);
+	return ret;
 }
 
 int
@@ -94,7 +111,7 @@ writefile()
 			       "#define GEN_SBAT_VAR_DEFS_H_\n"
 			       "#ifndef ENABLE_SHIM_DEVEL\n\n"
 			       "#ifndef SBAT_AUTOMATIC_DATE\n"
-			       "#define SBAT_AUTOMATIC_DATE 2023012900\n"
+			       "#define SBAT_AUTOMATIC_DATE 2024040900\n"
 			       "#endif /* SBAT_AUTOMATIC_DATE */\n"
 			       "#if SBAT_AUTOMATIC_DATE == %d\n"
 			       "#define SBAT_VAR_AUTOMATIC_REVOCATIONS\n",
