@@ -95,12 +95,12 @@ parse_sbat_section(char *section_base, size_t section_size,
 		struct csv_row * row;
 		size_t i;
 		const char **ptrs[] = {
-			&entry->component_name,
-			&entry->component_generation,
-			&entry->vendor_name,
-			&entry->vendor_package_name,
-			&entry->vendor_version,
-			&entry->vendor_url,
+			(const char **)&entry->component_name,
+			(const char **)&entry->component_generation,
+			(const char **)&entry->vendor_name,
+			(const char **)&entry->vendor_package_name,
+			(const char **)&entry->vendor_version,
+			(const char **)&entry->vendor_url,
 		};
 
 
@@ -144,8 +144,8 @@ verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sba
 		 * atoi returns zero for failed conversion, so essentially
 		 * badly parsed component_generation will be treated as zero
 		 */
-		sbat_gen = atoi((const char *)entry->component_generation);
-		sbat_var_gen = atoi((const char *)sbat_var_entry->component_generation);
+		sbat_gen = atoi(entry->component_generation);
+		sbat_var_gen = atoi(sbat_var_entry->component_generation);
 
 		if (sbat_gen < sbat_var_gen) {
 			dprint(L"component %a, generation %d, was revoked by %s variable\n",
@@ -280,9 +280,9 @@ parse_sbat_var_data(list_t *entry_list, UINT8 *data, UINTN datasize)
 		struct csv_row * row;
 		size_t i;
 		const char **ptrs[] = {
-			&entry->component_name,
-			&entry->component_generation,
-			&entry->sbat_datestamp,
+			(const char **)&entry->component_name,
+			(const char **)&entry->component_generation,
+			(const char **)&entry->sbat_datestamp,
 		};
 
 		row = list_entry(pos, struct csv_row, list);

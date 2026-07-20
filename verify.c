@@ -12,6 +12,9 @@
 #include "shim.h"
 
 #include <openssl/err.h>
+#include <crypto/err.h>
+#include <crypto/comperr.h>
+#include <crypto/ocsperr.h>
 #include <openssl/bn.h>
 #include <openssl/dh.h>
 #include <openssl/ocsp.h>
@@ -22,8 +25,9 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <openssl/rsa.h>
-#include <openssl/dso.h>
 
+#include <internal/dso.h>
+#include <openssl/objects.h>
 #include <Library/BaseCryptLib.h>
 
 #define OID_EKU_MODSIGN "1.3.6.1.4.1.2312.16.1.2"
@@ -38,26 +42,7 @@ void
 init_openssl(void)
 {
 	OPENSSL_init();
-	ERR_load_ERR_strings();
-	ERR_load_BN_strings();
-	ERR_load_RSA_strings();
-	ERR_load_DH_strings();
-	ERR_load_EVP_strings();
-	ERR_load_BUF_strings();
-	ERR_load_OBJ_strings();
-	ERR_load_PEM_strings();
-	ERR_load_X509_strings();
-	ERR_load_ASN1_strings();
-	ERR_load_CONF_strings();
-	ERR_load_CRYPTO_strings();
-	ERR_load_COMP_strings();
-	ERR_load_BIO_strings();
-	ERR_load_PKCS7_strings();
-	ERR_load_X509V3_strings();
-	ERR_load_PKCS12_strings();
-	ERR_load_RAND_strings();
-	ERR_load_DSO_strings();
-	ERR_load_OCSP_strings();
+	ossl_err_load_crypto_strings();
 }
 
 static void
@@ -129,8 +114,6 @@ verify_eku(UINT8 *Cert, UINTN CertSize)
 		X509_free(x509);
 	}
 
-	OBJ_cleanup();
-
 	return TRUE;
 }
 
@@ -145,10 +128,10 @@ check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList, UINTN dbsize,
 	int i = 0;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
-		if (CompareGuid (&CertList->SignatureType, &EFI_CERT_TYPE_X509_GUID) == 0) {
+		if (CompareGuid (&CertList->SignatureType, &EFI_CERT_TYPE_X509_GUID)) {
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
-			dprint(L"trying to verify cert %d (%s)\n", i++, dbname);
+			dprint(L"trying to verify cert %d (%s)\n", i, dbname);
 			if (verify_x509(Cert->SignatureData, CertSize)) {
 				if (verify_eku(Cert->SignatureData, CertSize)) {
 					drain_openssl_errors();
@@ -175,6 +158,7 @@ check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList, UINTN dbsize,
 
 		dbsize -= CertList->SignatureListSize;
 		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList + CertList->SignatureListSize);
+		i += 1;
 	}
 
 	return DATA_NOT_FOUND;
@@ -218,7 +202,7 @@ check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList, UINTN dbsize, UINT8 *data,
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		CertCount = (CertList->SignatureListSize -sizeof (EFI_SIGNATURE_LIST) - CertList->SignatureHeaderSize) / CertList->SignatureSize;
 		Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
-		if (CompareGuid(&CertList->SignatureType, &CertType) == 0) {
+		if (CompareGuid(&CertList->SignatureType, &CertType)) {
 			for (Index = 0; Index < CertCount; Index++) {
 				if (CompareMem (Cert->SignatureData, data, SignatureSize) == 0) {
 					//

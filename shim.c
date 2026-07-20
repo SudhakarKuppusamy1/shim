@@ -338,6 +338,7 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 				       netbootname, efi_status);
 			return efi_status;
 		}
+		FreePool(netbootname);
 		*data = sourcebuffer;
 		*datasize = sourcesize;
 	} else {
@@ -742,8 +743,9 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName,
 					break;
 				}
 
-				tmp = ReallocatePool(user_cert, original,
-						     user_cert_size);
+				tmp = ReallocatePool(original,
+						     user_cert_size,
+						     user_cert);
 				if (!tmp) {
 					FreePool(data);
 					return EFI_OUT_OF_RESOURCES;
@@ -847,7 +849,7 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 				if (buffersize > 1024)
 					goto done;
 			}
-			buffer = ReallocatePool(buffer, old, buffersize);
+			buffer = ReallocatePool(old, buffersize, buffer);
 			if (buffer == NULL) {
 				perror(L"Failed to read directory %s - %r\n",
 				       PathName, EFI_OUT_OF_RESOURCES);
@@ -1184,6 +1186,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	InitializeLib(image_handle, systab);
 	setup_verbosity();
+	update_watchdog();
 
 	dprint(L"vendor_authorized:0x%08lx vendor_authorized_size:%lu\n",
 	       vendor_authorized, vendor_authorized_size);

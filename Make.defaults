@@ -100,6 +100,13 @@ ifeq ($(ARCH),arm)
 	ARCH_LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
 	ARCH_SECTION_ALIGNMENT	?= 0x1000
 endif
+ifeq ($(ARCH),riscv64)
+	ARCH_CFLAGS		?= -DMDE_CPU_RISCV64 -DPAGE_SIZE=4096
+	ARCH_GNUEFI		?= riscv64
+	ARCH_SUFFIX		?= riscv64
+	ARCH_SUFFIX_UPPER	?= RISCV64
+	ARCH_SECTION_ALIGNMENT	?= 0x1000
+endif
 
 DEFINES		= -DDEFAULT_LOADER='L"$(DEFAULT_LOADER)"' \
 		  -DDEFAULT_LOADER_CHAR='"$(DEFAULT_LOADER)"'
@@ -160,8 +167,8 @@ endif
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC)
 FORMAT		?= --output-target efi-app-$(ARCH)
-LOCAL_EFI_PATH	= gnu-efi/$(ARCH_GNUEFI)/gnuefi
-LIBDIR		= gnu-efi/$(ARCH_GNUEFI)/lib
+LOCAL_EFI_PATH	= gnu-efi/gnuefi
+LIBDIR		= gnu-efi/lib
 
 MMSTEM		?= mm$(ARCH_SUFFIX)
 MMNAME		= $(MMSTEM).efi

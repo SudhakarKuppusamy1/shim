@@ -1,12 +1,12 @@
 #if defined(__x86_64__)
 /* shim.h will check if the compiler is new enough in some other CU */
 
-#if !defined(GNU_EFI_USE_EXTERNAL_STDARG)
-#define GNU_EFI_USE_EXTERNAL_STDARG
-#endif
-
 #if !defined(GNU_EFI_USE_MS_ABI)
 #define GNU_EFI_USE_MS_ABI
+#endif
+
+#if !defined(GNU_EFI_USE_COPYMEM_ABI)
+#define GNU_EFI_USE_COPYMEM_ABI 0
 #endif
 
 #ifdef NO_BUILTIN_VA_FUNCS

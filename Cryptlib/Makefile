@@ -4,6 +4,8 @@ endif
 
 CRYPTDIR	= $(TOPDIR)/Cryptlib
 
+DEFINES		+= -DGNU_EFI_USE_MS_ABI
+
 FEATUREFLAGS	+= -nostdinc
 
 INCLUDES	= -I$(CRYPTDIR) -I$(CRYPTDIR)/Include \
@@ -40,6 +42,9 @@ endif
 ifeq ($(ARCH),arm)
 DEFINES		+= -DMDE_CPU_ARM
 endif
+ifeq ($(ARCH),riscv64)
+DEFINES		+= -DMDE_CPU_RISCV64
+endif
 ifeq ($(ENABLE_CODESIGN_EKU),1)
 DEFINES += -DENABLE_CODESIGN_EKU
 endif
@@ -59,10 +64,13 @@ OBJS		=   Hash/CryptMd4Null.o \
 		    Cipher/CryptTdesNull.o \
 		    Cipher/CryptArc4Null.o \
 		    Rand/CryptRand.o \
+		    Rand/BaseRngLibNull.o \
 		    Pk/CryptRsaBasic.o \
 		    Pk/CryptRsaExtNull.o \
 		    Pk/CryptPkcs7SignNull.o \
-		    Pk/CryptPkcs7Verify.o \
+		    Pk/CryptPkcs7VerifyBase.o \
+		    Pk/CryptPkcs7VerifyCommon.o \
+		    Pk/CryptPkcs7VerifyRuntime.o \
 		    Pk/CryptDhNull.o \
 		    Pk/CryptTs.o \
 		    Pk/CryptX509.o \
@@ -71,7 +79,8 @@ OBJS		=   Hash/CryptMd4Null.o \
 		    SysCall/CrtWrapper.o \
 		    SysCall/TimerWrapper.o \
 		    SysCall/BaseMemAllocation.o \
-		    SysCall/BaseStrings.o
+		    SysCall/BaseStrings.o \
+		    SysCall/math.o \
 
 ifeq ($(ENABLE_CODESIGN_EKU),1)
 	OBJS += Pk/CryptPkcs7VerifyEku.o

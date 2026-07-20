@@ -38,13 +38,94 @@ CFLAGS += -DENABLE_SHIM_CERT
 else
 TARGETS += $(MMNAME) $(FBNAME)
 endif
-OBJS	= shim.o globals.o memattrs.o mok.o netboot.o cert.o dp.o loader-proto.o tpm.o version.o errlog.o sbat.o sbat_data.o sbat_var.o pe.o pe-relocate.o httpboot.o csv.o load-options.o utils.o verify.o
-KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
-ORIG_SOURCES	= shim.c globals.c memattrs.c mok.c netboot.c dp.c loader-proto.c tpm.c errlog.c sbat.c pe.c pe-relocate.c httpboot.c verify.c shim.h version.h $(wildcard include/*.h) cert.S sbat_var.S
-MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o errlog.o sbat_data.o globals.o dp.o
-ORIG_MOK_SOURCES = MokManager.c PasswordCrypt.c crypt_blowfish.c shim.h $(wildcard include/*.h)
-FALLBACK_OBJS = fallback.o tpm.o errlog.o sbat_data.o globals.o utils.o
+
+OBJS	= shim.o \
+	  cert.o \
+	  csv.o \
+	  dp.o \
+	  errlog.o \
+	  hexdump.o \
+	  httpboot.o \
+	  globals.o \
+	  load-options.o \
+	  loader-proto.o \
+	  memattrs.o \
+	  mok.o \
+	  netboot.o \
+	  pe.o \
+	  pe-relocate.o \
+	  sbat.o \
+	  sbat_data.o \
+	  sbat_var.o \
+	  time.o \
+	  tpm.o \
+	  utils.o \
+	  verify.o \
+	  version.o \
+
+KEYS	= shim_cert.h \
+	  ocsp.* \
+	  ca.* \
+	  shim.crt \
+	  shim.csr \
+	  shim.p12 \
+	  shim.pem \
+	  shim.key \
+	  shim.cer \
+
+ORIG_SOURCES	= shim.c \
+		  cert.S \
+		  csv.c \
+		  dp.c \
+		  errlog.c \
+		  hexdump.c \
+		  httpboot.c \
+		  globals.c \
+		  load-options.c \
+		  loader-proto.c \
+		  memattrs.c \
+		  mok.c \
+		  netboot.c \
+		  pe.c \
+		  pe-relocate.c \
+		  sbat.c \
+		  sbat_var.S \
+		  shim.h \
+		  time.c \
+		  tpm.c \
+		  utils.c \
+		  verify.c \
+		  version.h \
+		  $(wildcard include/*.h) \
+
+MOK_OBJS = MokManager.o \
+	   crypt_blowfish.o \
+	   dp.o \
+	   errlog.o \
+	   globals.o \
+	   hexdump.o \
+	   PasswordCrypt.o \
+	   sbat_data.o \
+	   time.o \
+	   utils.o \
+
+ORIG_MOK_SOURCES = MokManager.c \
+		   crypt_blowfish.c \
+		   PasswordCrypt.c \
+		   shim.h \
+		   $(wildcard include/*.h) \
+
+FALLBACK_OBJS = fallback.o \
+		errlog.o \
+		globals.o \
+		hexdump.o \
+		sbat_data.o \
+		time.o \
+		tpm.o \
+		utils.o
+
 ORIG_FALLBACK_SRCS = fallback.c
+
 SBATPATH = $(TOPDIR)/data/sbat.csv
 
 ifeq ($(SOURCE_DATE_EPOCH),)
@@ -150,8 +231,8 @@ $(SHIMNAME) $(MMNAME) $(FBNAME) : | post-process-pe
 LIBS = Cryptlib/libcryptlib.a \
        Cryptlib/OpenSSL/libopenssl.a \
        lib/lib.a \
-       gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a \
-       gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a
+       gnu-efi/lib/libefi.a \
+       gnu-efi/gnuefi/libgnuefi.a
 
 $(SHIMSONAME): $(OBJS) $(LIBS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
@@ -166,24 +247,95 @@ MokManager.o: $(MOK_SOURCES)
 $(MMSONAME): $(MOK_OBJS) $(LIBS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
-gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a: CFLAGS+=-DGNU_EFI_USE_EXTERNAL_STDARG
-gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a:
+gnu-efi/gnuefi/libgnuefi.a gnu-efi/lib/libefi.a:
 	mkdir -p gnu-efi/lib gnu-efi/gnuefi
 	$(MAKE) -C gnu-efi \
 		COMPILER="$(COMPILER)" \
 		CCC_CC="$(COMPILER)" \
 		CC="$(CC)" \
 		ARCH=$(ARCH_GNUEFI) \
+		NO_GLIBC=1 \
 		TOPDIR=$(TOPDIR)/gnu-efi \
+		VPATH=$(TOPDIR)/gnu-efi \
+		OBJDIR=. \
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		lib gnuefi inc $(IGNORE_COMPILER_ERRORS)
 
+CRYPTLIB_DIRS = Hash \
+		Hmac \
+		Cipher \
+		Pem \
+		Pk \
+		Rand \
+		SysCall \
+
 Cryptlib/libcryptlib.a:
-	for i in Hash Hmac Cipher Rand Pk Pem SysCall; do mkdir -p Cryptlib/$$i; done
+	for i in $(CRYPTLIB_DIRS) ; do mkdir -p Cryptlib/$$i; done
 	$(MAKE) TOPDIR=$(TOPDIR) VPATH=$(TOPDIR)/Cryptlib -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile $(IGNORE_COMPILER_ERRORS)
 
+CRYPTO_DIRS = aes \
+	      asn1 \
+	      async/arch \
+	      bio \
+	      bn \
+	      buffer \
+	      cmac \
+	      cms \
+	      comp \
+	      conf \
+	      dh \
+	      dso \
+	      ec \
+	      ec/curve448/arch_64 \
+	      encode_decode \
+	      err \
+	      evp \
+	      ffc \
+	      hashtable \
+	      hmac \
+	      hpke \
+	      http \
+	      kdf \
+	      lhash \
+	      md5 \
+	      ml_dsa \
+	      ml_kem \
+	      modes \
+	      objects \
+	      ocsp \
+	      pem \
+	      pkcs12 \
+	      pkcs7 \
+	      property \
+	      provider \
+	      rand \
+	      rc4 \
+	      rsa \
+	      sha \
+	      stack \
+	      txt_db \
+	      ui \
+	      x509 \
+	      x509v3 \
+
+PROVIDERS_DIRS = common/der \
+		 implementations/asymciphers \
+		 implementations/ciphers \
+		 implementations/digests \
+		 implementations/encode_decode \
+		 implementations/kem \
+		 implementations/keymgmt \
+		 implementations/macs \
+		 implementations/rands/seeding \
+		 implementations/signature \
+		 implementations/skeymgmt \
+
+STUB_DIRS = / \
+
 Cryptlib/OpenSSL/libopenssl.a:
-	for i in x509v3 x509 txt_db stack sha rsa rc4 rand pkcs7 pkcs12 pem ocsp objects modes md5 lhash kdf hmac evp err dso dh conf comp cmac buffer bn bio async/arch asn1 aes; do mkdir -p Cryptlib/OpenSSL/crypto/$$i; done
+	for i in $(CRYPTO_DIRS) ; do mkdir -p Cryptlib/OpenSSL/crypto/$$i; done
+	for i in $(PROVIDERS_DIRS) ; do mkdir -p Cryptlib/OpenSSL/providers/$$i; done
+	for i in $(STUB_DIRS) ; do mkdir -p Cryptlib/OpenSSL/stub/$$i; done
 	$(MAKE) TOPDIR=$(TOPDIR) VPATH=$(TOPDIR)/Cryptlib/OpenSSL -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile $(IGNORE_COMPILER_ERRORS)
 
 lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])
@@ -358,6 +510,8 @@ clean-gnu-efi:
 			COMPILER="$(COMPILER)" \
 			ARCH=$(ARCH_GNUEFI) \
 			TOPDIR=$(TOPDIR)/gnu-efi \
+			VPATH=$(TOPDIR)/gnu-efi \
+			OBJDIR=. \
 			-f $(TOPDIR)/gnu-efi/Makefile \
 			clean ; \
 	fi

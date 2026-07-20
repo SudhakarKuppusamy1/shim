@@ -8,10 +8,10 @@
 include $(TOPDIR)/Make.defaults
 
 CC = clang
-VALGRIND ?=
 DEBUG_PRINTS ?= 0
 OPTIMIZATIONS ?= -Og -ggdb
 FUZZ_ARGS ?=
+MAX_FUZZ_TIME ?=
 CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -isystem $(TOPDIR)/include/system \
 	 $(EFI_INCLUDES) \
@@ -19,13 +19,15 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -isystem /usr/include \
 	 -isystem $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
 	 $(ARCH_CFLAGS) \
+	 -fcoverage-mapping \
+	 -fprofile-instr-generate \
 	 -fsanitize=fuzzer,address \
 	 -fshort-wchar \
 	 -fno-builtin \
 	 -rdynamic \
 	 -fno-inline \
-	 -fno-eliminate-unused-debug-types \
-	 -fno-eliminate-unused-debug-symbols \
+	 $(if $(findstring gcc,$(CC)),-fno-eliminate-unused-debug-types) \
+	 $(if $(findstring gcc,$(CC)),-fno-eliminate-unused-debug-symbols) \
 	 -gpubnames \
 	 -grecord-gcc-switches \
 	 $(if $(findstring clang,$(CC)),-Wno-unknown-warning-option) \
@@ -48,10 +50,16 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 
 # On some systems (e.g. Arch Linux), limits.h is in the "include-fixed" instead
 # of the "include" directory
-CFLAGS += -isystem $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include-fixed)
+INCLUDE_FIXED = $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include-fixed)
+ifneq ($(strip $(INCLUDE_FIXED)),include-fixed)
+CFLAGS += -isystem $(INCLUDE_FIXED)
+endif
 
 # And on Debian also check the multi-arch include path
-CFLAGS += -isystem /usr/include/$(shell $(CC) $(ARCH_CFLAGS) -print-multiarch)
+MULTIARCH_ISYSTEM = $(if $(findstring gcc,$(CC)),$(shell $(CC) $(ARCH_CFLAGS) -print-multiarch))
+ifneq ($(strip $(MULTIARCH_ISYSTEM)),)
+CFLAGS += -isystem /usr/include/$(MULTIARCH_ISYSTEM)
+endif
 
 libefi-test.a :
 	$(MAKE) -C gnu-efi \
@@ -69,16 +77,37 @@ libefi-test.a :
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		clean
 
+fuzz-tftpboot_FILES = lib/string.c
+fuzz-tftpboot :: private FUZZ_ARGS=-dict=$(TOPDIR)/data/$@-dict.txt
+
+fuzz-pe-relocate_FILES = globals.c
+
+generated_sbat_var_defs.h :
+	$(MAKE) generated_sbat_var_defs.h
+
 fuzz-sbat_FILES = csv.c lib/variables.c lib/guid.c sbat_var.S mock-variables.c
+fuzz-sbat :: | generated_sbat_var_defs.h
 fuzz-sbat :: CFLAGS+=-DHAVE_GET_VARIABLE -DHAVE_GET_VARIABLE_ATTR -DHAVE_SHIM_LOCK_GUID
 
 fuzzers := $(patsubst %.c,%,$(wildcard fuzz-*.c))
 
 $(fuzzers) :: fuzz-% : | libefi-test.a
 
+ifneq ($(strip $(MAX_FUZZ_TIME)),)
+MAX_TOTAL_TIME=-max_total_time=$(MAX_FUZZ_TIME)
+else
+MAX_TOTAL_TIME=
+endif
+
 $(fuzzers) :: fuzz-% : test.c fuzz-%.c $(fuzz-%_FILES)
 	$(CC) $(CFLAGS) -o $@ $(sort $^ $(wildcard $*.c) $(fuzz-$*_FILES)) libefi-test.a -lefivar
-	$(VALGRIND) ./$@ -max_len=4096 -jobs=24 $(FUZZ_ARGS)
+	mkdir -p $@-corpus
+	cd $@-corpus ; LLVM_PROFILE_FILE="$@.profraw" ../$@ \
+		-jobs=24 \
+		-max_len=4096 \
+		$(MAX_TOTAL_TIME) \
+		$(FUZZ_ARGS) \
+		../$@-corpus
 
 fuzz : $(fuzzers)
 	$(MAKE) -f include/fuzz.mk fuzz-clean

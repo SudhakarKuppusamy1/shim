@@ -480,32 +480,6 @@ gnuefi_strncmp (
     return len ? *s1 - *s2 : 0;
 }
 
-/*
- * This is still broken, and fails the test case as written on arm.
- * We no longer use this, so we do not strictly need to run it.
- */
-#if !defined(__arm__) && !defined(__aarch64__)
-static inline INTN
-gnuefi_signed_strncmp (
-    IN CONST CHAR8    *s1,
-    IN CONST CHAR8    *s2,
-    IN UINTN    len
-    )
-{
-    while (*s1  &&  len) {
-        if (*s1 != *s2) {
-            break;
-        }
-
-        s1  += 1;
-        s2  += 1;
-        len -= 1;
-    }
-
-    return len ? *s1 - *s2 : 0;
-}
-#endif
-
 static inline INTN
 gnuefi_good_strncmp (
     IN CONST CHAR8    *s1p,
@@ -714,18 +688,6 @@ test_strncmp(void)
 	rc = test_strncmp_helper(gnuefi_strncmp, true, true, false);
 	status = MIN(rc, status);
 #pragma GCC diagnostic pop
-
-	/*
-	 * This is still broken, and fails the test case as written on arm.
-	 * We no longer use this, so we do not strictly need to run it.
-	 */
-#if !defined(__arm__) && !defined(__aarch64__)
-	/*
-	 * gnu-efi's broken strncmpa with the return type fixed
-	 */
-	rc = test_strncmp_helper(gnuefi_signed_strncmp, true, false, true);
-	status = MIN(rc, status);
-#endif
 
 	/*
 	 * gnu-efi's strncmpa with the return type fixed and unsigned
@@ -1466,6 +1428,126 @@ test_strntoken_with_ascii_nul(void)
 	return 0;
 }
 
+static int
+test_strspn_some_accepted(void)
+{
+	char string[] = "abcdefghijklmnop";
+	char accepted[] = "abcdefghijklm";
+
+	assert_equal_return(strspn(string, accepted), 13, 1, "got %zu expected %d\n");
+	assert_equal_return(shim_strspn(string, accepted), 13, 1, "got %zu expected %d\n");
+
+	return 0;
+}
+
+static int
+test_strspn_none_accepted(void)
+{
+	char string[] = "abcdefghijklmnop";
+	char accepted[] = "qrstuv";
+
+	assert_equal_return(strspn(string, accepted), 0, 1, "got %zu expected %d\n");
+	assert_equal_return(shim_strspn(string, accepted), 0, 1, "got %zu expected %d\n");
+
+	return 0;
+}
+
+static int
+test_strspn_all_accepted(void)
+{
+	char string[] = "abcdefghijklm";
+	char accepted[] = "abcdefghijklmn";
+
+	assert_equal_return(strspn(string, accepted), 13, 1, "got %zu expected %d\n");
+	assert_equal_return(shim_strspn(string, accepted), 13, 1, "got %zu expected %d\n");
+
+	return 0;
+}
+
+static int
+test_strcspn_some_rejected(void)
+{
+	char string[] = "abcdefghijklmnop";
+	char rejections[] = "d";
+
+	assert_equal_return(strcspn(string, rejections), 3, 1, "got %zu expected %d\n");
+	assert_equal_return(shim_strcspn(string, rejections), 3, 1, "got %zu expected %d\n");
+
+	return 0;
+}
+
+static int
+test_strcspn_none_rejected(void)
+{
+	char string[] = "abcdefghijklm";
+	char rejections[] = "nopqrstuv";
+
+	assert_equal_return(strcspn(string, rejections), 13, 1, "got %zu expected %d\n");
+	assert_equal_return(shim_strcspn(string, rejections), 13, 1, "got %zu expected %d\n");
+
+	return 0;
+}
+
+static int
+test_strcspn_all_rejected(void)
+{
+	char string[] = "abcdefghijklm";
+	char rejections[] = "abcdefghijklm";
+
+	assert_equal_return(strcspn(string, rejections), 0, 1, "got %zu expected %d\n");
+	assert_equal_return(shim_strcspn(string, rejections), 0, 1, "got %zu expected %d\n");
+
+	return 0;
+}
+
+static int
+test_strstr_found_beginning(void)
+{
+	char haystack[] = "abcdefghijklm";
+	char needle[] = "abcd";
+
+	assert_equal_return(strstr(haystack, needle), &haystack[0], 1, "got %p expected %p\n");
+	assert_equal_return(shim_strstr(haystack, needle), &haystack[0], 1, "got %p expected %p\n");
+
+	return 0;
+}
+
+static int
+test_strstr_found_middle(void)
+{
+	char haystack[] = "abcdefghijklm";
+	char needle[] = "efgh";
+
+	assert_equal_return(strstr(haystack, needle), &haystack[4], 1, "got %p expected %p\n");
+	assert_equal_return(shim_strstr(haystack, needle), &haystack[4], 1, "got %p expected %p\n");
+
+	return 0;
+}
+
+static int
+test_strstr_found_end(void)
+{
+	char haystack[] = "abcdefghijklm";
+	char needle[] = "ijklm";
+
+	assert_equal_return(strstr(haystack, needle), &haystack[8], 1, "got %p expected %p\n");
+	assert_equal_return(shim_strstr(haystack, needle), &haystack[8], 1, "got %p expected %p\n");
+
+	return 0;
+}
+
+static int
+test_strstr_not_found(void)
+{
+	char haystack[] = "abcdefghijklm";
+	char needle[] = "nopq";
+
+	assert_equal_return(strstr(haystack, needle), NULL, 1, "got %p expected %p\n");
+	assert_equal_return(shim_strstr(haystack, needle), NULL, 1, "got %p expected %p\n");
+
+	return 0;
+}
+
 int
 main(void)
 {
@@ -1492,6 +1574,17 @@ main(void)
 	test(test_strntoken_size_2);
 	test(test_strntoken_no_ascii_nul);
 	test(test_strntoken_with_ascii_nul);
+	test(test_strspn_some_accepted);
+	test(test_strspn_none_accepted);
+	test(test_strspn_all_accepted);
+	test(test_strcspn_some_rejected);
+	test(test_strcspn_none_rejected);
+	test(test_strcspn_all_rejected);
+	test(test_strstr_found_beginning);
+	test(test_strstr_found_middle);
+	test(test_strstr_found_end);
+	test(test_strstr_not_found);
+
 	return status;
 }
 

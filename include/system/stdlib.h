@@ -11,7 +11,26 @@
  */
 #include <stddef.h>
 
-static inline void abort(void) { }
+static inline void
+__pause(void)
+{
+#if defined(__x86_64__) || defined(__i386__) || defined(__i686__)
+	__asm__ __volatile__("pause");
+#elif defined(__aarch64__)
+	__asm__ __volatile__("wfi");
+#else
+	extern void usleep(unsigned long usecs);
+	usleep(1000);
+#endif
+}
+
+static inline void __attribute__((__noreturn__))
+abort(void)
+{
+	do {
+		__pause();
+	} while (1);
+}
 
 #include <builtins_begin_.h>
 mkbi1_(int, abs, int, j)

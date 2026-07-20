@@ -26,9 +26,16 @@
 #define TFTP_ERROR_EXISTS       6  /* File already exists. */
 #define TFTP_ERROR_NO_USER      7  /* No such user. */
 
-static EFI_PXE_BASE_CODE *pxe;
+/* Fuzzing harness needs access to some variables that are normally static */
+#ifdef SHIM_ENABLE_LIBFUZZER
+#define __expose_libfuzzer
+#else
+#define __expose_libfuzzer static
+#endif
+
+__expose_libfuzzer EFI_PXE_BASE_CODE *pxe;
 static EFI_IP_ADDRESS tftp_addr;
-static CHAR8 *full_path;
+__expose_libfuzzer CHAR8 *full_path;
 
 
 typedef struct {
@@ -146,7 +153,7 @@ static CHAR8 *str2ip6(CHAR8 *str)
 	if (dotcount > MAX_IP6_DOTS)
 		return (CHAR8 *)ip;
 
-	len = strlen(str);
+	len = strlen((char *)str);
 	a = b = str;
 
 	for (i = 0; i < len; i++) {
@@ -193,7 +200,7 @@ static CHAR8 *str2ip6(CHAR8 *str)
 	return (CHAR8 *)ip;
 }
 
-static BOOLEAN extract_tftp_info(CHAR8 *url, CHAR8 *name)
+static BOOLEAN extract_tftp_info(CHAR8 *url, CONST CHAR8 *name)
 {
 	CHAR8 *start, *end;
 	CHAR8 ip6str[40];
@@ -203,7 +210,7 @@ static BOOLEAN extract_tftp_info(CHAR8 *url, CHAR8 *name)
 
 	while (name[template_len++] != '\0');
 	template = (CHAR8 *)AllocatePool((template_len + 1) * sizeof (CHAR8));
-	translate_slashes(template, name);
+	translate_slashes((char *)template, (char *)name);
 
 	// to check against str2ip6() errors
 	memset(ip6inv, 0, sizeof(ip6inv));
@@ -243,23 +250,23 @@ static BOOLEAN extract_tftp_info(CHAR8 *url, CHAR8 *name)
 		FreePool(template);
 		return FALSE;
 	}
-	full_path = AllocateZeroPool(strlen(end)+strlen(template)+1);
+	full_path = AllocateZeroPool(strlen((char *)end)+strlen((char *)template)+1);
 	if (!full_path) {
 		FreePool(template);
 		return FALSE;
 	}
-	memcpy(full_path, end, strlen(end));
+	memcpy(full_path, end, strlen((char *)end));
 	end = (CHAR8 *)strrchr((char *)full_path, '/');
 	if (!end)
 		end = (CHAR8 *)full_path;
-	memcpy(end, template, strlen(template));
-	end[strlen(template)] = '\0';
+	memcpy(end, template, strlen((char *)template));
+	end[strlen((char *)template)] = '\0';
 
 	FreePool(template);
 	return TRUE;
 }
 
-static EFI_STATUS parseDhcp6(CHAR8 *name)
+static EFI_STATUS parseDhcp6(CONST CHAR8 *name)
 {
 	EFI_PXE_BASE_CODE_DHCPV6_PACKET *packet = (EFI_PXE_BASE_CODE_DHCPV6_PACKET *)&pxe->Mode->DhcpAck.Raw;
 	CHAR8 *bootfile_url;
@@ -275,7 +282,7 @@ static EFI_STATUS parseDhcp6(CHAR8 *name)
 	return EFI_SUCCESS;
 }
 
-static EFI_STATUS parseDhcp4(CHAR8 *name)
+static EFI_STATUS parseDhcp4(CONST CHAR8 *name)
 {
 	CHAR8 *template;
 	INTN template_len = 0;
@@ -284,8 +291,8 @@ static EFI_STATUS parseDhcp4(CHAR8 *name)
 
 	while (name[template_len++] != '\0');
 	template = (CHAR8 *)AllocatePool((template_len + 1) * sizeof (CHAR8));
-	translate_slashes(template, name);
-	template_len = strlen(template) + 1;
+	translate_slashes((char *)template, (char *)name);
+	template_len = strlen((char *)template) + 1;
 
 	if(pxe->Mode->ProxyOfferReceived) {
 		/*
@@ -305,7 +312,7 @@ static EFI_STATUS parseDhcp4(CHAR8 *name)
 			pkt_v4 = &pxe->Mode->PxeReply.Dhcpv4;
 	}
 
-	INTN dir_len = strnlen((CHAR8 *)pkt_v4->BootpBootFile, 127);
+	INTN dir_len = strnlen((char *)pkt_v4->BootpBootFile, 127);
 	INTN i;
 	UINT8 *dir = pkt_v4->BootpBootFile;
 
@@ -323,7 +330,7 @@ static EFI_STATUS parseDhcp4(CHAR8 *name)
 	}
 
 	if (dir_len > 0) {
-		strncpy(full_path, (CHAR8 *)dir, dir_len);
+		strncpy((char *)full_path, (char *)dir, dir_len);
 		if (full_path[dir_len-1] == '/' && template[0] == '/')
 			full_path[dir_len-1] = '\0';
 		/*
@@ -338,14 +345,14 @@ static EFI_STATUS parseDhcp4(CHAR8 *name)
 	}
 	if (dir_len == 0 && dir[0] != '/' && template[0] == '/')
 		template_ofs++;
-	strcat(full_path, template + template_ofs);
+	strcat((char *)full_path, (char *)template + template_ofs);
 	memcpy(&tftp_addr.v4, pkt_v4->BootpSiAddr, 4);
 
 	FreePool(template);
 	return EFI_SUCCESS;
 }
 
-EFI_STATUS parseNetbootinfo(EFI_HANDLE image_handle UNUSED, CHAR8 *netbootname)
+EFI_STATUS parseNetbootinfo(EFI_HANDLE image_handle UNUSED, CONST CHAR8 *netbootname)
 {
 
 	EFI_STATUS efi_status;

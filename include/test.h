@@ -9,8 +9,12 @@
 #define TEST_H_
 
 #define _GNU_SOURCE
+#define GNU_EFI_USE_EXTERNAL_STDARG
 
 #include <stdarg.h>
+
+typedef va_list ms_va_list;
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -185,7 +189,13 @@ guidcmp(const EFI_GUID * const guid0, const EFI_GUID * const guid1)
 	return ret;
 }
 
-#define CompareGuid(a, b) guidcmp(a, b)
+#if defined(CompareGuid)
+#undef CompareGuid
+#endif
+
+#define CompareGuid(a, b) (guidcmp(a, b) == 0)
+
+#define CompareGuidForSorting(a, b) guidcmp(a, b)
 
 static inline char *
 efi_strerror(EFI_STATUS status)

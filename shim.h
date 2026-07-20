@@ -31,12 +31,11 @@
 #pragma GCC diagnostic ignored "-Wpointer-bool-conversion"
 #endif
 
-#if !defined(GNU_EFI_USE_EXTERNAL_STDARG)
-#define GNU_EFI_USE_EXTERNAL_STDARG
-#endif
-
 #if !defined(GNU_EFI_USE_MS_ABI)
 #define GNU_EFI_USE_MS_ABI
+#endif
+#if !defined(GNU_EFI_USE_COPYMEM_ABI)
+#define GNU_EFI_USE_COPYMEM_ABI 0
 #endif
 
 #ifdef NO_BUILTIN_VA_FUNCS
@@ -129,6 +128,21 @@
 #endif
 #endif
 
+#if defined(__riscv) && __riscv_xlen == 64
+#ifndef DEFAULT_LOADER
+#define DEFAULT_LOADER L"\\grubriscv64.efi"
+#endif
+#ifndef DEFAULT_LOADER_CHAR
+#define DEFAULT_LOADER_CHAR "\\grubriscv64.efi"
+#endif
+#ifndef EFI_ARCH
+#define EFI_ARCH L"riscv64"
+#endif
+#ifndef DEBUGDIR
+#define DEBUGDIR L"/usr/lib/debug/usr/share/shim/riscv64/"
+#endif
+#endif
+
 #ifndef DEBUGSRC
 #define DEBUGSRC L"/usr/src/debug/shim-" VERSIONSTR "." EFI_ARCH
 #endif
@@ -190,6 +204,7 @@
 #endif
 #include "include/simple_file.h"
 #include "include/str.h"
+#include "include/time.h"
 #include "include/tpm.h"
 #include "include/utils.h"
 #include "include/cc.h"
@@ -201,7 +216,7 @@
 #include "version.h"
 
 #ifndef SHIM_UNIT_TEST
-#include "Cryptlib/Include/OpenSslSupport.h"
+#include "Cryptlib/Include/CrtLibSupport.h"
 #endif
 
 #define MEM_ATTR_R	4
